@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>支払い記録</title>
+  <style>
+    .tables-container {
+      display: flex;
+      gap: 20px;
+      justify-content: start;
+      flex-wrap: wrap;
+    }
+    table {
+      border-collapse: collapse;
+      min-width: 220px;
+    }
+    table, th, td {
+      border: 1px solid black;
+      padding: 4px;
+    }
+  </style>
+</head>
+<body>
+  <h2>支払い記録</h2>
+  <label>年:</label>
+  <select id="year"></select><br>
+  
+  <label>月:</label>
+  <select id="month"></select><br>
+  
+  <label>日:</label>
+  <select id="day"></select><br>
+  
+  <label>支払い内容:</label>
+  <input type="text" id="paymentText" placeholder="支払い内容"><br>
+  <label>金額:</label>
+  <input type="number" id="amount" placeholder="金額"><br>
+  <label>支払い方法名:</label>
+  <input type="text" id="paymentMethod" placeholder="例：現金"><br><br>
+
+  <button onclick="submitPayment()">記録する</button>
+
+  <h3>📋 記録一覧</h3>
+  <div class="tables-container" id="tablesContainer"></div>
+
+  <script>
+    // 年・月・日を自動セット
+function setupDateSelectors() {
+  const yearSelect = document.getElementById('year');
+  const monthSelect = document.getElementById('month');
+  const daySelect = document.getElementById('day');
+
+  const thisYear = new Date().getFullYear();
+  for (let y = thisYear - 100; y <= thisYear + 100; y++) {
+    let option = document.createElement('option');
+    option.value = y;
+    option.text = y;
+    yearSelect.appendChild(option);
+  }
+
+  for (let m = 1; m <= 12; m++) {
+    let option = document.createElement('option');
+    option.value = m.toString().padStart(2, '0');
+    option.text = m;
+    monthSelect.appendChild(option);
+  }
+
+  for (let d = 1; d <= 31; d++) {
+    let option = document.createElement('option');
+    option.value = d.toString().padStart(2, '0');
+    option.text = d;
+    daySelect.appendChild(option);
+  }
+
+  // 今日の日付を初期選択
+  const today = new Date();
+  yearSelect.value = today.getFullYear();
+  monthSelect.value = (today.getMonth() + 1).toString().padStart(2, '0');
+  daySelect.value = today.getDate().toString().padStart(2, '0');
+}
+
+// ページ読み込み時に呼び出し
+setupDateSelectors();
+
+    let storageData = JSON.parse(localStorage.getItem('customPayments')) || {};
+
+    // 🟢 支払い内容入力 → 支払い方法にも自動コピー
+    document.getElementById('paymentText').addEventListener('input', function() {
+      const text = this.value;
+      const methodInput = document.getElementById('paymentMethod');
+      methodInput.value = text;  // 入力するたび上書き
+    });
+
+    function renderAllTables() {
+      const container = document.getElementById('tablesContainer');
+      container.innerHTML = '';
+
+      for (const method in storageData) {
+        const records = [...storageData[method]];
+        records.sort((a, b) => new Date(a.date) - new Date(b.date));
+
+        const div = document.createElement('div');
+        div.innerHTML = `<h3>${method}</h3>
+          <table><tr><th>日付</th><th>内容</th><th>金額</th><th>操作</th></tr></table>
+          <p id="sum-${method}"></p>`;
+        const table = div.querySelector('table');
+
+        let sum = 0;
+        records.forEach((record, index) => {
+          const row = table.insertRow(-1);
+          row.insertCell(0).innerText = record.date;
+          row.insertCell(1).innerText = record.text;
+          row.insertCell(2).innerText = `${record.amount} 円`;
+          row.insertCell(3).innerHTML = `<button onclick="deleteRecord('${method}', ${index})">削除</button>`;
+          sum += Number(record.amount);
+        });
+
+        div.querySelector(`#sum-${method}`).innerText = ` 合計: ${sum.toLocaleString()} 円`;
+        container.appendChild(div);
+      }
+    }
+
+    function submitPayment() {
+      const year = document.getElementById('year').value;
+      const month = document.getElementById('month').value.padStart(2, '0');
+      const day = document.getElementById('day').value.padStart(2, '0');
+      const text = document.getElementById('paymentText').value;
+      const amount = document.getElementById('amount').value;
+      const method = document.getElementById('paymentMethod').value.trim();
+
+      if (!year || !month || !day || !text || !amount || !method) {
+        alert("すべての項目を入力してください！");
+        return;
+      }
+
+      if (!storageData[method]) {
+        storageData[method] = [];
+      }
+
+      storageData[method].push({
+        date: `${year}-${month}-${day}`,
+        text: text,
+        amount: Number(amount)
+      });
+
+      localStorage.setItem('customPayments', JSON.stringify(storageData));
+
+      document.getElementById('year').value = '';
+      document.getElementById('month').value = '';
+      document.getElementById('day').value = '';
+      document.getElementById('paymentText').value = '';
+      document.getElementById('amount').value = '';
+      document.getElementById('paymentMethod').value = '';
+
+      renderAllTables();
+    }
+
+    function deleteRecord(method, index) {
+      storageData[method].splice(index, 1);
+      if (storageData[method].length === 0) {
+        delete storageData[method];
+      }
+      localStorage.setItem('customPayments', JSON.stringify(storageData));
+      renderAllTables();
+    }
+
+    renderAllTables();
+  </script>
+</body>
+</html>
